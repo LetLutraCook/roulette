@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Roulette</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h1>Roulette</h1>
+
+<canvas id="canvas" width="500" height="500" style="display:block;margin:0 auto 12px;max-width:90vw;height:auto"></canvas>
+
+<!-- Dealer controls (non-floating, placed between wheel and table status) -->
+<div id="dealerWrapper" style="display:none;">
+  <div id="dealerControls" class="inline-controls">
+    <button id="openBtn" onclick="openBets()">Open Bets</button>
+    <button id="closeBtn" onclick="closeBets()">Close Bets</button>
+    <button id="spinBtn" onclick="spin()" disabled>Spin</button>
+  </div>
+</div>
+
+<div id="betStatus" class="closed">BETS CLOSED</div>
+
+<div id="table" aria-label="Roulette betting table" role="grid"></div>
+
+<!-- Table legend -->
+<div id="tableLegend">
+  <div class="legendItem"><span class="dot red"></span> Red</div>
+  <div class="legendItem"><span class="dot black"></span> Black</div>
+  <div class="legendItem"><span class="dot green"></span> Green</div>
+</div>
+
+<div id="betBoard">
+  <h2>Table Status</h2>
+  <div id="lastResult">Last Result: —</div>
+  <div id="players"></div>
+</div>
+
+<div id="dealerLogin">
+  <input id="code" type="password" placeholder="Dealer Code">
+  <button onclick="login()">Dealer Login</button>
+</div>
+
+
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="client.js"></script>
+</body>
+</html>

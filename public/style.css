@@ -1,0 +1,223 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 12px;
+  background: #0e0e0e;
+  color: #eee;
+  font-family: system-ui, sans-serif;
+}
+
+h1, h2 {
+  text-align: center;
+}
+
+/* -------- BET STATUS (fruitiger aero) -------- */
+
+#betStatus {
+  text-align: center;
+  font-size: 18px; /* ~25% larger */
+  font-weight: 800;
+  padding: 6px 12px;
+  margin: 10px auto;
+  max-width: 320px;
+  border-radius: 8px;
+  color: #ddd;
+  background: transparent;
+  box-shadow: none;
+  border: 1px solid rgba(255,255,255,0.03);
+}
+
+#betStatus.open { border-color: #1f8b3a; color: #35b257; }
+#betStatus.closed { border-color: #8b1e1e; color: #c34a4a; }
+
+/* -------- TABLE -------- */
+
+#table {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+  width: 320px; /* match #betStatus max-width */
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+  background: #0f0f0f; /* match cells so grid gaps don't show a seam */
+  padding: 4px;
+  border-radius: 8px;
+  justify-content: center;
+}
+
+.cell {
+  aspect-ratio: 1 / 1; /* keep cells square */
+  min-width: 32px; /* prevents cells from getting too tiny */
+  border-radius: 5px; /* square with rounded corners */
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  border: 1px solid rgba(0,0,0,0.95);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.85);
+  transition: transform 160ms cubic-bezier(.2,.9,.3,1), box-shadow 160ms;
+  position: relative;
+  color: white;
+  backdrop-filter: blur(2px);
+  overflow: hidden;
+  background-clip: padding-box;
+  background-color: #0f0f0f; /* fallback for gradients to avoid artifacts */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+  padding: 0;
+}
+
+.cell .number { pointer-events: none; }
+
+.cell:hover { transform: translateY(-4px) scale(1.015); box-shadow: 0 14px 28px rgba(0,0,0,0.75); cursor: pointer; }
+
+.red { background: linear-gradient(180deg,#ff6b6b 0%, #c94b4b 60%, #881b1b 100%); }
+.black { background: linear-gradient(180deg,#4b4b4b 0%, #1a1a1a 60%, #000 100%); }
+.green { background: linear-gradient(180deg,#3cd37a 0%, #1da64a 60%, #0b6c2b 100%); }
+
+.selected { box-shadow: 0 22px 48px rgba(0,0,0,0.75), 0 0 0 6px rgba(255,255,255,0.03); transform: translateY(-10px) scale(1.04); }
+
+/* small chip count badge */
+.chipCount {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  font-size: 9px;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.06);
+  min-width: 14px;
+  text-align: center;
+  box-shadow: 0 6px 10px rgba(0,0,0,0.45);
+}
+
+/* legend */
+#tableLegend { display:flex; gap:12px; justify-content:center; margin-bottom:12px; }
+.legendItem { display:flex; align-items:center; gap:8px; color:#ddd; font-weight:600; }
+.legendItem .dot { width:14px; height:14px; border-radius:50%; display:inline-block; }
+.legendItem .red { background:#8b1e1e; }
+.legendItem .black { background:#111; }
+.legendItem .green { background:#1f8b3a; }
+
+.disabled { opacity: 0.4; pointer-events: none; }
+
+/* -------- STATUS BOARD -------- */
+
+#betBoard {
+  background: #161616;
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 90px;
+}
+
+#lastResult {
+  text-align: center;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.playerRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 4px;
+}
+
+.betValue { color: #aaa; }
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.win { background: #1f8b3a; }
+.lose { background: #8b1e1e; }
+.partial-win { background: #4ea0f0; }
+
+/* -------- DEALER -------- */
+
+#dealerLogin {
+  position: fixed;
+  right: 10px;
+  bottom: 10px;
+  width: min(90vw, 260px);
+  background: #1b1b1b;
+  padding: 12px;
+  border-radius: 14px;
+}
+
+/* Inline control bar placed between wheel and status */
+#dealerWrapper {
+  display: none; /* toggled to 'flex' when visible */
+  align-items: center;
+  justify-content: center;
+  margin: 12px auto;
+  width: min(90vw, 420px);
+  min-height: 56px;
+}
+
+.inline-controls {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  background: #1b1b1b;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.inline-controls button {
+  flex: 1;
+  background: #0f0f0f;
+  color: #ddd;
+  padding: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.7);
+}
+.inline-controls button:hover { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); }
+
+.inline-controls button:disabled {
+  opacity: 0.4;
+}
+
+#dealerControls {
+  width: 100%;
+}
+
+
+input, button {
+  width: 100%;
+  padding: 10px;
+  font-size: 18px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  border: none;
+}
+
+button {
+  background: #333;
+  color: #eee;
+}
+
+button:disabled {
+  opacity: 0.4;
+}
+
+/* Responsive: slightly smaller cells on narrow screens */
+@media (max-width: 420px) {
+  #table { grid-template-columns: repeat(6, 28px); max-width: 220px; padding: 3px; }
+  .cell { width: 28px; height: 28px; font-size: 11px; border-radius: 4px; }
+  .chipCount { right: 4px; top: 4px; font-size: 9px; min-width: 12px; }
+}
