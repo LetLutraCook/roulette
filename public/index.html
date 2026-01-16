@@ -25,17 +25,22 @@
 
 <div id="table" aria-label="Roulette betting table" role="grid"></div>
 
-<!-- Table legend -->
-<div id="tableLegend">
-  <div class="legendItem"><span class="dot red"></span> Red</div>
-  <div class="legendItem"><span class="dot black"></span> Black</div>
-  <div class="legendItem"><span class="dot green"></span> Green</div>
+<!-- Table legend removed per UI request -->
+
+<!-- Quick color bet buttons (styled to match the table) -->
+<div id="colorBets" class="color-bets">
+  <button id="betRed" class="colorBetBtn redBtn">Bet Red</button>
+  <button id="betBlack" class="colorBetBtn blackBtn">Bet Black</button>
+  <button id="clearBet" class="colorBetBtn clearBtn">Clear Bet</button>
 </div>
 
-<div id="betBoard">
-  <h2>Table Status</h2>
-  <div id="lastResult">Last Result: —</div>
-  <div id="players"></div>
+<div id="betArea">
+  <div id="sliderColumn" aria-hidden="true"></div>
+  <div id="betBoard">
+    <h2>Table Status</h2>
+    <div id="lastResult">Last Result: —</div>
+    <div id="players"></div>
+  </div>
 </div>
 
 <div id="dealerLogin">

@@ -8,6 +8,14 @@ body {
   font-family: system-ui, sans-serif;
 }
 
+/* avoid horizontal scroll from sliders positioned outside containers */
+html, body { overflow-x: hidden; }
+
+:root {
+  /* responsive width for bet/status and table: min/max clamped to sensible values */
+  --bet-bar-width: clamp(280px, 33vw, 720px);
+}
+
 h1, h2 {
   text-align: center;
 }
@@ -20,7 +28,7 @@ h1, h2 {
   font-weight: 800;
   padding: 6px 12px;
   margin: 10px auto;
-  max-width: 320px;
+  max-width: var(--bet-bar-width);
   border-radius: 8px;
   color: #ddd;
   background: transparent;
@@ -38,8 +46,9 @@ h1, h2 {
   grid-template-columns: repeat(6, 1fr);
   gap: 6px;
   margin-bottom: 12px;
-  width: 320px; /* match #betStatus max-width */
-  max-width: 320px;
+  /* match the bet status bar width but stay responsive */
+  width: min(var(--bet-bar-width), 94vw);
+  max-width: var(--bet-bar-width);
   margin-left: auto;
   margin-right: auto;
   background: #0f0f0f; /* match cells so grid gaps don't show a seam */
@@ -115,7 +124,11 @@ h1, h2 {
   background: #161616;
   border-radius: 12px;
   padding: 10px;
-  margin-bottom: 90px;
+  margin: 12px auto 90px;
+  /* keep bet board aligned with bet status bar width, but allow smaller viewports */
+  width: min(var(--bet-bar-width), 94vw);
+  max-width: var(--bet-bar-width);
+  overflow: visible; /* allow sliders to sit outside the box */
 }
 
 #lastResult {
@@ -129,6 +142,26 @@ h1, h2 {
   justify-content: space-between;
   align-items: center;
   padding: 6px 4px;
+  position: relative;
+}
+
+.playerName {
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.playerName.disconnected {
+  background: rgba(200,50,50,0.12);
+  color: #ffdede;
+}
+
+.playerLeft { display:flex; align-items:center; gap:8px; }
+.playerSlider { width: 92px; height: 20px; position: absolute; left: -112px; top: 50%; transform: translateY(-50%); }
+
+/* On smaller screens, keep the slider in-flow instead of outside the box */
+@media (max-width: 640px) {
+  .playerSlider { position: relative; left: 0; transform: none; margin-right: 6px; width: 84px; }
+  .playerRow { gap: 8px; }
+  #betBoard { padding: 8px; margin-bottom: 64px; }
 }
 
 .betValue { color: #aaa; }
@@ -143,6 +176,50 @@ h1, h2 {
 .win { background: #1f8b3a; }
 .lose { background: #8b1e1e; }
 .partial-win { background: #4ea0f0; }
+.color-only { background: linear-gradient(180deg,#d95bd9 0%, #b13fb1 60%, #7f1c7f 100%); }
+
+/* Quick color bet buttons (styled to match table aesthetics) */
+.color-bets {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 8px auto 12px;
+  max-width: min(var(--bet-bar-width), 94vw);
+}
+.colorBetBtn {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: none;
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.55);
+  cursor: pointer;
+  min-width: 110px;
+  text-align: center;
+  transition: transform 140ms cubic-bezier(.2,.9,.3,1), box-shadow 140ms;
+}
+.colorBetBtn:not(:disabled):hover { transform: translateY(-4px); }
+.colorBetBtn:not(:disabled):active { transform: translateY(-1px); }
+.colorBetBtn.redBtn { background: linear-gradient(180deg,#ff6b6b 0%, #c94b4b 60%, #881b1b 100%); }
+.colorBetBtn.blackBtn { background: linear-gradient(180deg,#4b4b4b 0%, #1a1a1a 60%, #000 100%); }
+.colorBetBtn.clearBtn {
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  color: #ddd;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.colorBetBtn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .color-bets { gap: 8px; }
+  .colorBetBtn { min-width: 72px; padding: 6px 8px; font-size: 13px; }
+}
 
 /* -------- DEALER -------- */
 

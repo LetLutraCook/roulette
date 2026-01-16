@@ -52,6 +52,15 @@ async function doLogin() {
 }
 
 const table = document.getElementById("table");
+const betRedBtn = document.getElementById('betRed');
+const betBlackBtn = document.getElementById('betBlack');
+const clearBetBtn = document.getElementById('clearBet');
+const colorBetsContainer = document.getElementById('colorBets');
+
+function updateColorButtonsVisibility() {
+  if (!colorBetsContainer) return;
+  colorBetsContainer.style.display = isDealer ? 'none' : 'flex';
+}
 const playersDiv = document.getElementById("players");
 const lastResultDiv = document.getElementById("lastResult");
 const dealerLogin = document.getElementById("dealerLogin");
@@ -81,6 +90,218 @@ const arc = Math.PI / (options.length / 2);
 let resize = 1;
 let ctx = null;
 let canvas = document.getElementById("canvas");
+
+// Audio & tick detection for wheel 'clicks'
+let audioCtx = null; // initialized on first user interaction
+let lastTickIndex = null; // last slice index that produced a tick
+let lastAngular = null; // last normalized angle at arrow
+let lastFrameTime = null;
+
+function ensureAudioCtx() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch (e) {
+    audioCtx = null;
+  }
+}
+
+function playTick(speed) {
+  // Roulette-like: light but deep thock + click
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const ac = audioCtx;
+  const now = ac.currentTime;
+  const sp = Math.max(0, Math.min(1, speed || 0));
+
+  // master mixer (keep volume safe)
+  const master = ac.createGain();
+  master.gain.value = 0.95;
+  master.connect(ac.destination);
+
+  // LIGHT CLICK (short bright transient) - boosted for immediate, sharp click
+  try {
+    const clickDur = 0.008; // 8ms (sharper)
+    const buf = ac.createBuffer(1, Math.max(1, Math.floor(ac.sampleRate * clickDur)), ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 0.8);
+      if (i < Math.max(1, Math.floor(data.length * 0.18))) data[i] *= 2.8; // emphasize the attack portion
+    }
+
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 3000 + sp * 1600; // brighter center to bite
+    bp.Q.value = 4 + sp * 3;
+
+    const g = ac.createGain();
+    const peak = 0.09 + sp * 0.06; // stronger click peak
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(peak, now + 0.0008); // near-instant peak
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+
+    src.connect(bp);
+    bp.connect(g);
+    g.connect(master);
+
+    src.start(now);
+    src.stop(now + clickDur + 0.006);
+
+    // Add a short HF oscillator transient for extra 'bite' without being piercing
+    try {
+      const osc = ac.createOscillator();
+      const og = ac.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = 5200 + sp * 2400; // 5200..7600Hz
+      og.gain.setValueAtTime(0.0001, now);
+      og.gain.linearRampToValueAtTime(peak * 0.28, now + 0.0007);
+      og.gain.exponentialRampToValueAtTime(0.0001, now + 0.03);
+      osc.connect(og);
+      og.connect(master);
+      osc.start(now);
+      osc.stop(now + 0.035);
+    } catch (e) {
+      // ignore osc errors
+    }
+  } catch (e) {
+    // ignore
+  }
+
+  // DEEP THOCK (low-frequency body) - reduced and slightly delayed so it doesn't mask the click
+  try {
+    const thFreq = 85 + sp * 40; // 85..125 Hz (slightly higher so it's less boomy)
+    const th = ac.createOscillator();
+    th.type = 'sine';
+    th.frequency.value = thFreq;
+    const tg = ac.createGain();
+    // start very low then peak a bit later so click is clearly audible
+    tg.gain.setValueAtTime(0.0001, now);
+    const thPeak = 0.012 + sp * 0.02; // a bit gentler overall
+    tg.gain.linearRampToValueAtTime(thPeak * 0.35, now + 0.03); // very small early level
+    tg.gain.linearRampToValueAtTime(thPeak, now + 0.07); // reach peak after click
+    tg.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
+    // gentle lowpass to keep warmth but avoid masking mids
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 700;
+
+    th.connect(tg);
+    tg.connect(lp);
+    lp.connect(master);
+
+    th.start(now);
+    th.stop(now + 0.26);
+  } catch (e) {
+    // ignore
+  }
+
+  // SMALL METALLIC ECHO (tiny) to add realism but kept low and slightly earlier
+  try {
+    const echoDelay = 0.010 + sp * 0.01; // 10..20ms
+    const delayNode = ac.createDelay(0.05);
+    delayNode.delayTime.value = echoDelay;
+    const echoGain = ac.createGain();
+    echoGain.gain.value = 0.016 + sp * 0.02; // slightly lower than before
+
+    // use a highband filtered noise for the echo
+    const echoDur = 0.018;
+    const eb = ac.createBuffer(1, Math.max(1, Math.floor(ac.sampleRate * echoDur)), ac.sampleRate);
+    const ed = eb.getChannelData(0);
+    for (let i = 0; i < ed.length; i++) ed[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / ed.length, 2);
+    const eSrc = ac.createBufferSource();
+    eSrc.buffer = eb;
+    const eBp = ac.createBiquadFilter();
+    eBp.type = 'bandpass';
+    eBp.frequency.value = 2800 + sp * 1800;
+    eBp.Q.value = 3;
+
+    eSrc.connect(eBp);
+    eBp.connect(echoGain);
+    echoGain.connect(delayNode);
+    delayNode.connect(master);
+
+    eSrc.start(now);
+    eSrc.stop(now + echoDur);
+  } catch (e) {
+    // ignore
+  }
+}
+
+// Small number-select sound (pleasant bell + subtle click)
+function playSelectSound(intensity = 0.6) {
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const ac = audioCtx;
+  const now = ac.currentTime;
+  const it = Math.max(0, Math.min(1, intensity || 0.6));
+
+  // Bell body (two detuned sines) for a musical selection tone
+  try {
+    const o1 = ac.createOscillator();
+    const o2 = ac.createOscillator();
+    const g = ac.createGain();
+    const bp = ac.createBiquadFilter();
+
+    o1.type = 'sine';
+    o2.type = 'sine';
+    const baseFreq = 720 + it * 260; // ~720..980Hz
+    o1.frequency.value = baseFreq;
+    o2.frequency.value = baseFreq * 1.498; // just under a fifth for pleasantness
+    o2.detune.value = (Math.random() * 6 - 3);
+
+    // gentle bandpass to keep the bell focused
+    bp.type = 'bandpass';
+    bp.frequency.value = 900 + it * 600;
+    bp.Q.value = 1.6;
+
+    const peak = 0.04 * it + 0.02;
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.linearRampToValueAtTime(peak, now + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+
+    o1.connect(g);
+    o2.connect(g);
+    g.connect(bp);
+    bp.connect(ac.destination);
+
+    o1.start(now);
+    o2.start(now);
+    o1.stop(now + 0.18);
+    o2.stop(now + 0.18);
+  } catch (e) {
+    // ignore
+  }
+
+  // Short click layer to emphasize selection (very short noise)
+  try {
+    const dur = 0.012;
+    const buf = ac.createBuffer(1, Math.max(1, Math.floor(ac.sampleRate * dur)), ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 1.2);
+
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    const hp = ac.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 1200 + it * 1000;
+    const g2 = ac.createGain();
+    const pk2 = 0.02 * it + 0.006;
+    g2.gain.setValueAtTime(0.0001, now);
+    g2.gain.linearRampToValueAtTime(pk2, now + 0.002);
+    g2.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+
+    src.connect(hp);
+    hp.connect(g2);
+    g2.connect(ac.destination);
+
+    src.start(now);
+    src.stop(now + dur + 0.005);
+  } catch (e) {
+    // ignore
+  }
+}
 
 function getColor(n) {
   if (n === 0) return "#008b0f"; // green
@@ -241,12 +462,44 @@ function animateToNumber(targetNumber, duration = 3800) {
     const delta = finalOvershoot - start;
     const startTime = performance.now();
 
+    // reset tick tracking for this animation
+    lastTickIndex = null;
+    lastAngular = null;
+    lastFrameTime = null;
+
     function frame(now) {
       const elapsed = now - startTime;
       const t = Math.min(1, elapsed / duration);
       const eased = easeOut(t);
 
       startAngle = start + delta * eased;
+
+      // Tick detection: compute which slice is at the arrow (top: -PI/2)
+      const normalizedAtArrow = normalizeAngle(startAngle + Math.PI / 2);
+      const idx = Math.floor(normalizedAtArrow / arc);
+
+      // Estimate speed (higher speed => louder/faster tick)
+      let speed = 0;
+      if (lastFrameTime !== null && lastAngular !== null) {
+        let angDelta = normalizedAtArrow - lastAngular;
+        // wrap into -PI..PI for smallest diff
+        if (angDelta > Math.PI) angDelta -= Math.PI * 2;
+        if (angDelta < -Math.PI) angDelta += Math.PI * 2;
+        const dt = Math.max(1, now - lastFrameTime); // ms
+        const angularVel = Math.abs(angDelta) / dt; // rad per ms
+        // Convert to 'ticks' scale and clamp
+        speed = Math.min(4, (angularVel * 1000) / (arc * 6));
+      }
+
+      // Only play tick when slice index changes (a stud or divider passes the arrow)
+      if (idx !== lastTickIndex) {
+        playTick(speed);
+        lastTickIndex = idx;
+      }
+
+      lastAngular = normalizedAtArrow;
+      lastFrameTime = now;
+
       drawRouletteWheel();
 
       if (t < 1) requestAnimationFrame(frame);
@@ -261,6 +514,26 @@ function animateToNumber(targetNumber, duration = 3800) {
           const se = Math.min(1, (now2 - settleStart) / settleDuration);
           const eased2 = easeOut(se);
           startAngle = settleFrom + (settleTo - settleFrom) * eased2;
+
+          // ticks during settle too
+          const normalized2 = normalizeAngle(startAngle + Math.PI / 2);
+          const idx2 = Math.floor(normalized2 / arc);
+          let speed2 = 0;
+          if (lastAngular !== null) {
+            let angDelta2 = normalized2 - lastAngular;
+            if (angDelta2 > Math.PI) angDelta2 -= Math.PI * 2;
+            if (angDelta2 < -Math.PI) angDelta2 += Math.PI * 2;
+            const dt2 = Math.max(1, now2 - (lastFrameTime || now2));
+            const angularVel2 = Math.abs(angDelta2) / dt2;
+            speed2 = Math.min(4, (angularVel2 * 1000) / (arc * 6));
+          }
+          if (idx2 !== lastTickIndex) {
+            playTick(speed2);
+            lastTickIndex = idx2;
+          }
+          lastAngular = normalized2;
+          lastFrameTime = now2;
+
           drawRouletteWheel();
           if (se < 1) requestAnimationFrame(settle);
           else {
@@ -303,6 +576,14 @@ function showResultOnWheel(number) {
   ctx.fillStyle = 'white';
   ctx.fillText(text, (size / 2) - ctx.measureText(text).width / 2, (size / 2) + Math.round(0.03 * size));
   ctx.restore();
+  // Play a small selection sound so the chosen number is audible
+  try {
+    ensureAudioCtx();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    playSelectSound(0.7);
+  } catch (e) {
+    // ignore
+  }
 }
 
 // Resize/calc initial draw
@@ -393,12 +674,37 @@ function closeBets() {
 
 function spin() {
   if (!isDealer || isAnimating) return;
+  // Ensure audio can start (resume on user gesture if needed)
+  ensureAudioCtx();
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
   // mark animating locally as a fallback in case server doesn't respond
   isAnimating = true;
   socket.emit("spin", [Math.random()]);
   // fallback to clear animating after animation+buffer to avoid stuck state
   setTimeout(() => { isAnimating = false; updateSpinButton(); }, 5000);
 }
+
+// Color bet buttons
+if (betRedBtn) betRedBtn.onclick = () => {
+  if (!betsOpen || isDealer) return;
+  myBet = 'red';
+  document.querySelectorAll(".cell").forEach(c => c.classList.remove("selected"));
+  socket.emit('select', 'red');
+};
+if (betBlackBtn) betBlackBtn.onclick = () => {
+  if (!betsOpen || isDealer) return;
+  myBet = 'black';
+  document.querySelectorAll(".cell").forEach(c => c.classList.remove("selected"));
+  socket.emit('select', 'black');
+};
+if (clearBetBtn) clearBetBtn.onclick = () => {
+  if (isDealer) return;
+  myBet = null;
+  document.querySelectorAll(".cell").forEach(c => c.classList.remove("selected"));
+  // remove selection on server by sending null
+  socket.emit('select', null);
+};
 
 function toggleDealer() {
   dealerCollapsed = !dealerCollapsed;
@@ -419,6 +725,7 @@ socket.on("dealerGranted", () => {
   if (openBtn) openBtn.disabled = betsOpen;
   if (closeBtn) closeBtn.disabled = !betsOpen;
   updateSpinButton();
+  updateColorButtonsVisibility();
 });
 
 socket.on("dealerState", active => {
@@ -444,6 +751,7 @@ socket.on("dealerState", active => {
       if (tableEl) tableEl.style.display = "grid";
       if (betBoard) betBoard.style.display = "block";
     }
+    updateColorButtonsVisibility();
   }
 });
 
@@ -468,6 +776,10 @@ socket.on("betsState", open => {
     if (closeBtn) closeBtn.disabled = true;
     if (spinBtn) spinBtn.disabled = true;
   }
+  // color bet buttons should be disabled when bets are closed
+  if (betRedBtn) betRedBtn.disabled = !open || isDealer;
+  if (betBlackBtn) betBlackBtn.disabled = !open || isDealer;
+  if (clearBetBtn) clearBetBtn.disabled = !open || isDealer; // disable clear when bets closed too
 });
 
 socket.on("leaderboard", data => {
@@ -540,31 +852,72 @@ socket.on("spinResult", res => {
 function renderBoard() {
   playersDiv.innerHTML = "";
 
-  Object.values(players).forEach(p => {
+  // preserve server-sent order by iterating entries
+  Object.entries(players).forEach(([key, p]) => {
     const row = document.createElement("div");
     row.className = "playerRow";
 
+    const leftWrap = document.createElement('div');
+    leftWrap.className = 'playerLeft';
+
+    // If this client is the dealer and the player is connected, show slider to left
+    if (isDealer && p.connected === true && key && !String(key).startsWith('u:')) {
+      // don't show a slider for the Dealer row
+      if ((p.name || '').toLowerCase() !== 'dealer') {
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.min = 0;
+        slider.max = 2;
+        slider.step = 0.5;
+        slider.value = p.weight !== undefined ? String(p.weight) : '1';
+        slider.className = 'playerSlider';
+        slider.title = 'Bias weight for this player';
+        slider.oninput = (e) => {
+          const v = Number(e.target.value);
+          socket.emit('setWeight', { target: key, weight: v });
+        };
+        leftWrap.appendChild(slider);
+      }
+    }
+
     const left = document.createElement("div");
+    left.className = 'playerName';
     left.textContent = p.name;
+    if (p.connected === false) left.classList.add('disconnected');
+    leftWrap.appendChild(left);
 
     const right = document.createElement("div");
 
-    const bet = document.createElement("span");
-    bet.className = "betValue";
-    bet.textContent = p.bet ?? "—";
-    right.appendChild(bet);
+    // Hide 'No bet' or any bet label for the Dealer row
+    if ((p.name || '').toLowerCase() !== 'dealer') {
+      const bet = document.createElement("span");
+        bet.className = "betValue";
+        let displayBet = "No bet";
+        if (p.bet !== undefined && p.bet !== null) {
+          if (typeof p.bet === 'string') {
+            if (p.bet.toLowerCase() === 'red') displayBet = 'Red';
+            else if (p.bet.toLowerCase() === 'black') displayBet = 'Black';
+            else displayBet = String(p.bet);
+          } else {
+            displayBet = String(p.bet);
+          }
+        }
+        bet.textContent = displayBet;
+      right.appendChild(bet);
+    }
 
     if (p.result) {
       const badge = document.createElement("span");
       if (p.result === "WIN") badge.className = "badge win";
       else if (p.result === "COLOR") badge.className = "badge partial-win";
+      else if (p.result === "COLOR_ONLY") badge.className = "badge color-only";
       else badge.className = "badge lose";
 
-      badge.textContent = p.result === "COLOR" ? "WIN (Color)" : p.result;
+      badge.textContent = (p.result === "COLOR" || p.result === "COLOR_ONLY") ? "WIN (Color)" : p.result;
       right.appendChild(badge);
     }
 
-    row.append(left, right);
+    row.append(leftWrap, right);
     playersDiv.appendChild(row);
   });
 }
@@ -577,6 +930,12 @@ function updateSpinButton() {
   if (openBtn) openBtn.disabled = betsOpen || isAnimating;
   if (closeBtn) closeBtn.disabled = !betsOpen || isAnimating;
 }
+
+// One-time gesture to ensure audio can play in browsers that require user interaction
+document.addEventListener('click', () => {
+  ensureAudioCtx();
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}, { once: true });
 
 // Start login after socket event handlers are registered
 doLogin();
