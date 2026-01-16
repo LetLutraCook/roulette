@@ -1,2 +1,9 @@
-983452,Dealer
+346872,Dealer
+678453,Nathan
+543921,Sammy
+843298,Gavin
+203891,Elric
+093653,Matthew
 654321,Seb
+012348,Sage
+097532,Andrew (loser)
