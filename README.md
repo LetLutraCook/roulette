@@ -1,5 +1,5 @@
 # roulette
-horrendous vibe coded bullshit for a school project
+nodejs roulette project for school
 
 many thanks to trondkla for their [roulette wheel](https://github.com/trondkla/roulette-wheel) code
 
